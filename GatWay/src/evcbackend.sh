@@ -1,0 +1,1 @@
+node /root/evctestbackend/server.js
