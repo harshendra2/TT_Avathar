@@ -11,13 +11,13 @@ module.exports = app => {
      router.get("/getallsellpriceandbv",auth,partneractivity.getoverallPriceBVSale)
      router.get("/getDirectDetailteamstatistics/:address",auth,partneractivity.getDirectDetailTeamstatistics);
    
-     router.get("/updateUserRank",partneractivity.processTotalUserRank);   // Update Rank temp
+    router.get("/updateUserRank",partneractivity.processTotalUserRank);
       
     router.get("/storeteamstatistics",partneractivity.StoreTeamstatistics);
     router.get("/getteamstatistics",auth,partneractivity.getTeamstatistics);
     router.get("/getdirectteamstatistics/:address", auth,partneractivity.getDirectTeamstatisticslatestfirst);
     router.put("/updateteamstatistics/:userAddress", auth,partneractivity.updateTeamstatistics);
-    router.get("/getuserrankbonuses/:address/:amount/:sponsoraddress",partneractivity.getUserRankBonuses);   // Here I need to fix the bugs
+    router.get("/getuserrankbonuses/:address", auth,partneractivity.getUserRankBonuses);
     router.get("/getuserrank/:address", auth,partneractivity.getUserRank);
   
     //get all token for all users

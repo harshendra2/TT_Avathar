@@ -1,10 +1,10 @@
 const express = require('express');
 const app = express();
 const cors=require('cors');
+const path=require('path')
 const routes = require('./routes/route');
 const sertUpCron=require('./cronjobs');
-//const authMiddleware = require('./middlewares/auth');
-//app.use(authMiddleware);
+
 
 app.use(express.json());
 sertUpCron();
@@ -14,6 +14,7 @@ var corsOptions = {
 };
 app.use(cors(corsOptions));
 app.use(express.urlencoded({ extended: true }));
+app.use("/Images", express.static(path.join(__dirname, '/Images')));
 app.use(routes);
 
 const PORT =8080;

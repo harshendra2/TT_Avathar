@@ -21,8 +21,8 @@ db.mongoose
     process.exit();
   });
 
-require("./routes/mintnft.routes")(app);
-require("./routes/nft.routes")(app);
-app.listen(3003, () => {
-  console.log(`Server is running on port ${3003}.`);
+require("./routes/activity.routes")(app);
+require("./routes/partneractivity.routes")(app);
+app.listen(3004, () => {
+  console.log(`Server is running on port ${3004}.`);
 });

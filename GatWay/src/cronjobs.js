@@ -81,7 +81,7 @@ async function callUserRank() {
 const setupCronJobs =async () => {
     cron.schedule('*/5 * * * *', async () => {
         try {
-            await Promise.all([callStoreTeamStatistics(), callUserRank()]);
+             await Promise.all([callStoreTeamStatistics(), callUserRank()]);
             logMessage('Running task every 5 minutes');
         } catch (error) {
             console.error('Error executing scheduled task:', error);

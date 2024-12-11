@@ -299,7 +299,6 @@ exports.processTotalUserRank = async (req, res) => {
         await Promise.all(updates);
         return res.status(200).send({ status: true, message: "User  data updates successfully" });
     } catch (error) {
-        console.log(error)
         return res.status(500).json({ status: false, error: 'Internal Server Error' });
     }
 }
@@ -310,22 +309,27 @@ async function getUserRankup(address) {
     const teamSaleVolume = teamStatisticData ? teamStatisticData.teamsale : 0;
     const adminChangeStatus = teamStatisticData?.adminchangestatus || false;
     const currentRank = teamStatisticData?.rank || 0;
+    const thresholds = [25000, 75000, 225000, 675000, 2025000, 6075000, 18225000];
+
+    const nftHoldPromises = Array.from({ length: 7 }, (_, i) => CheckHoldNft(address, i + 1));
+    const [nftHolds, thresholdData] = await Promise.all([
+        Promise.all(nftHoldPromises),
+        thresholds
+    ]);
 
     for (let nftLevel = 7; nftLevel >= 1; nftLevel--) {
-        const [hasNft, thresholdData] = await Promise.all([
-            CheckHoldNft(address, nftLevel),
-            getThreshold(nftLevel)
-        ]);
+        const hasNft = nftHolds[nftLevel - 1];
+        const threshold = thresholdData[nftLevel - 1];
+        if (!hasNft || teamSaleVolume < threshold) continue;
 
-        if (!hasNft || teamSaleVolume < thresholdData) continue;
+        const requiredAmount = thresholds[nftLevel - 2] || 0;
 
-        const requiredAmount = await getRequiredAmount(nftLevel - 1);
-        const rankUplifted = nftLevel === 1 || await getRankUplifting(address, nftLevel - 1, requiredAmount);
+        const rankUplifted = nftLevel === 1 || (await getRankUplifting(address, nftLevel - 1, requiredAmount));
 
         if (adminChangeStatus && ((nftLevel === 1 && currentRank > nftLevel) || (nftLevel !== 1 && currentRank < nftLevel))) {
             return currentRank;
         }
-        
+
         if (rankUplifted) {
             return nftLevel;
         }
@@ -333,7 +337,6 @@ async function getUserRankup(address) {
 
     return 0;
 }
-
 
 
 async function CheckHoldNft(address, nftLevel) {
@@ -344,129 +347,145 @@ async function CheckHoldNft(address, nftLevel) {
 
 async function getRankUplifting(user, nftLevel, requiredAmount) {
     const ReferralData = await Referral.find({ sponsoraddress: user });
-    let memberRankCount = 0;
+    if (!ReferralData.length) return false;
 
-    const promises = ReferralData.map(async (referral) => {
+    const thresholds = [25000, 75000, 225000, 675000, 2025000, 6075000];
+    const newNFTLevel = nftLevel - 1;
+    const newAmount = thresholds[nftLevel - 2] || 0;
+
+    const memberRankPromises = ReferralData.map(async (referral) => {
         const member = referral.myaddress;
-        const [TeamstatisticData, MintnftData, TeamSale] = await Promise.all([
+
+        const [TeamstatisticData, MintnftData] = await Promise.all([
             Teamstatistic.findOne({ walletaddress: member }),
             CheckHoldNft(member, nftLevel),
-            getTeamSaleVolume(member),
         ]);
 
         const adminchangestatus = TeamstatisticData?.adminchangestatus || false;
         const teamstatisticrank = TeamstatisticData?.rank || 0;
-        let isSatisfied = false;
 
         if (adminchangestatus && teamstatisticrank >= nftLevel) {
-            memberRankCount++;
-            isSatisfied = true;
-        } else if (MintnftData && teamstatisticrank >= nftLevel && TeamSale >= requiredAmount) {
-            if (requiredAmount == 25000) {
-                memberRankCount++;
-                isSatisfied = true;
-                if (adminchangestatus && teamstatisticrank >= nftLevel) {
-                    memberRankCount--;
-                    isSatisfied = false;
-                }
-            } else {
-                const amounts = [25000, 75000, 225000, 675000, 2025000, 6075000];
-                const newNFTLevel = nftLevel - 1;
-                const newAmount = amounts[nftLevel - 2] || 0;
+            return true;
+        }
 
+        if (MintnftData && teamstatisticrank >= nftLevel) {
+            const TeamSale = await getTeamSaleVolume(member);
+            if (TeamSale >= requiredAmount) {
+                // For specific cases like requiredAmount == 25000
+                if (requiredAmount === 25000) return true;
                 if (await getRankUplifting(member, newNFTLevel, newAmount)) {
-                    if (await verifyReferralRanks(member, nftLevel - 1)) {
-                    memberRankCount++;
-                    isSatisfied = true;
-                    }
-                    if (adminchangestatus && teamstatisticrank >= nftLevel) {
-                        memberRankCount--;
-                        isSatisfied = false;
-                    }
-                }
-            }
-        }
-
-        if (memberRankCount < 3 && !isSatisfied && TeamSale >= requiredAmount) {
-            const found = await legSearch(member, nftLevel, requiredAmount);
-            if (found) {
-                memberRankCount++;
-            }
-        }
-
-        return memberRankCount >= 3;
-    });
-
-    const results = await Promise.all(promises);
-    return results.includes(true);
-}
-
-
-
-async function verifyReferralRanks(user, requiredRank) {
-    const ReferralData = await Referral.find({ sponsoraddress: user });
-    let rankAchievers = 0;
-
-    for (let i = 0; i < ReferralData.length; i++) {
-        const member = ReferralData[i].myaddress;
-        const TeamstatisticData = await Teamstatistic.findOne({ walletaddress: member });
-        const memberRank = TeamstatisticData?.rank || 0;
-
-        if (memberRank == requiredRank) {
-            rankAchievers++;
-        }
-
-        if (rankAchievers >= 3) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-
-
-
-async function legSearch(member, nftLevel, amount) {
-    const ReferralData = await Referral.find({ sponsoraddress: member });
-    if (ReferralData.length === 0) {
-        return false;
-    }
-
-    const promises = ReferralData.map(async (referral) => {
-        const referrer = referral.myaddress;
-        const [TeamstatisticData, MintnftData, referrerTeamSale] = await Promise.all([
-            Teamstatistic.findOne({ walletaddress: referrer }),
-            CheckHoldNft(referrer, nftLevel),
-            getTeamSaleVolume(referrer),
-        ]);
-
-        const adminchangestatus = TeamstatisticData?.adminchangestatus || false;
-        const teamstatisticrank = TeamstatisticData?.rank || 0;
-
-        if (adminchangestatus && teamstatisticrank >= nftLevel) {
-            return true;
-        }
-
-        if (!adminchangestatus && MintnftData && teamstatisticrank >= nftLevel && referrerTeamSale >= amount) {
-            if (amount === 25000) {
-                return true;
-            } else {
-                const amounts = [25000, 75000, 225000, 675000, 2025000, 6075000];
-                const newNftLevel = nftLevel - 1;
-                const newAmount = amounts[nftLevel - 2] || 0;
-
-                if (await getRankUplifting(referrer, newNftLevel, newAmount)) {
                     return true;
                 }
             }
         }
 
-        return legSearch(referrer, nftLevel, amount);
+        const TeamSale = await getTeamSaleVolume(member);
+        if (TeamSale >= requiredAmount) {
+            const found = await legSearch(member, nftLevel, requiredAmount);
+            return found;
+        }
+
+        return false;
     });
 
-    const results = await Promise.all(promises);
-    return results.includes(true);
+    const results = await Promise.all(memberRankPromises);
+    const memberRankCount = results.filter(Boolean).length;
+
+    return memberRankCount >= 3;
+}
+
+
+async function legSearch(member, nftlevel, amount){
+ 
+    const ReferralData = await Referral.aggregate([
+        {
+            $match: { sponsoraddress: member }
+        },
+        {
+            $lookup: {
+                from: 'teamstatistics',
+                localField: 'myaddress',
+                foreignField: 'walletaddress',
+                as: 'teamStatisticData'
+            }
+        },
+        {
+            $lookup: {
+                from: 'mintnfts',
+                let: { address: '$myaddress' },
+                pipeline: [
+                    {
+                        $match: {
+                            $expr: {
+                                $and: [
+                                    { $eq: ['$useraddress', '$$address'] },
+                                    { $eq: ['$level', nftlevel] }
+                                ]
+                            }
+                        }
+                    },
+                    { $limit: 1 }
+                ],
+                as: 'mintNftData'
+            }
+        },
+        {
+            $project: {
+                myaddress: 1,
+                teamStatisticData: { $arrayElemAt: ['$teamStatisticData', 0] },
+                mintNftExists: { $gt: [{ $size: '$mintNftData' }, 0] }
+            }
+        },
+        {
+            $addFields: {
+                adminchangestatus: { $ifNull: ['$teamStatisticData.adminchangestatus', false] },
+                teamstatisticrank: { $ifNull: ['$teamStatisticData.rank', 0] }
+            }
+        }
+    ]); 
+    if (ReferralData.length === 0) {
+        return false;
+    }
+    
+    const operations = ReferralData.map(async (referral) => {
+        const referrer = referral.myaddress;
+        const adminchangestatus = referral.adminchangestatus;
+        const teamstatisticrank = referral.teamstatisticrank;
+        const mintNftExists = referral.mintNftExists;
+    
+        if (adminchangestatus && teamstatisticrank >= nftlevel) {
+            return true;
+        }
+    
+        if (!adminchangestatus) {
+            if (mintNftExists && teamstatisticrank >= nftlevel) {
+                const referrerTeamSale = await getTeamSaleVolume(referrer);
+                if (referrerTeamSale >= amount) {
+                    if (amount === 25000) {
+                        return true;
+                    } else {
+                        const amounts = [25000, 75000, 225000, 675000, 2025000, 6075000];
+                        const newNftlevel = nftlevel - 1;
+                        const newamount = amounts[newNftlevel] || 0;
+                        const RankUp = await getRankUplifting(referrer, newNftlevel, newamount);
+                        if (RankUp) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+    
+        const legSearchresult = await legSearch(referrer, nftlevel, amount);
+        if (legSearchresult) {
+            return true;
+        }
+    
+        return false;
+    });
+    
+    const results = await Promise.all(operations);
+    return results.includes(true); 
 }
 
 async function getTeamSaleVolume(address) {
@@ -954,108 +973,60 @@ exports.updateTeamstatistics = (req, res) => {
 };
 
 
+exports.getUserRankBonuses = async(req, res) => {
+    try{
+        const address = req.params.address;
+        const RankBonuses = await userRankBonuses(address);
+        res.send({status:true,message:"Get User Rank Bonuses",RankBonuses:RankBonuses});
+    }
+    catch(error){
+       res.status(500).send({
+        message:
+        error.message || "Some error occurred while retrieving get User Rank Bonuses."
+        });
+    }
+    
+};
+
 
 async function userRankBonuses(user) {
 
-    let referrer = await Referral.findOne({ myaddress:user });
-    let referrerCount = 0;
-    while (referrer != null) {
-        referrerCount++;
-        referrer = await Referral.findOne({ myaddress:referrer.sponsoraddress });
-    }
-    let addressArray = [];
-    let bonusArray = [];
- 
-    referrer = await Referral.findOne({ myaddress:user });
-    const existsData = await Teamstatistic.findOne({walletaddress:referrer.sponsoraddress});
-    const userRank = existsData?existsData.rank:0;
-    let index = 0;
-    let previousRank = 0;
-    for (let i = 0; i < referrerCount; i++) {
-        const getrank = await Teamstatistic.findOne({walletaddress:referrer.sponsoraddress});
-        const rank = getrank?getrank.rank:0;
-        if (rank >= userRank && rank > previousRank) {
-            const bonusPercentage = (rank - previousRank) * 4;
-            const sponsoraddress = referrer.sponsoraddress;
-            addressArray.push(sponsoraddress);
-            bonusArray.push(bonusPercentage);
-            
-            index++;
-            previousRank = rank;
-        }
-        referrer = await Referral.findOne({ myaddress:referrer.sponsoraddress });
-    }
-    const finalAddressRanks = 
-    {
-        address : addressArray.slice(0, index),
-        bonus : bonusArray.slice(0, index),
-    }
-    
-    return finalAddressRanks; 
- }
- 
- exports.getUserRankBonuses = async (req, res) => {
-    try {
-        const { address, amount, sponsoraddress } = req.params;
-        const RankBonuses = await UserRankDistribution(address, amount, sponsoraddress);
-        res.send({ status: true, message: "Get User Rank Bonuses", RankBonuses });
-    } catch (error) {
-        res.status(500).send({
-            message: error.message || "Some error occurred while retrieving User Rank Bonuses."
-        });
-    }
-};
+   let referrer = await Referral.findOne({ myaddress:user });
+   let referrerCount = 0;
+   while (referrer != null) {
+       referrerCount++;
+       referrer = await Referral.findOne({ myaddress:referrer.sponsoraddress });
+   }
+   let addressArray = [];
+   let bonusArray = [];
 
-async function UserRankDistribution(user, nftAmount, sponsoraddress) {
-    let currentReferrer = await Referral.findOne({ myaddress: sponsoraddress });
-
-    if (!currentReferrer) {
-        throw new Error("Sponsor address is invalid or not found.");
-    }
-
-    const addressArray = [];
-    const rankArray = [];
-    let previousRank = 0;
-
-    while (currentReferrer) {
-        const referrerAddress = currentReferrer.myaddress;
-
-        // Calculate team sales including the new investment
-        const teamSaleVolume = await getTeamSaleVolume(referrerAddress);
-        const totalTeamSale = teamSaleVolume + nftAmount;
-
-        // Get current rank eligibility
-        const currentRank = await getUserRankup(referrerAddress, totalTeamSale);
-
-        // Check if this referrer qualifies for a higher rank
-        if (currentRank > previousRank) {
-            addressArray.push(referrerAddress);
-            rankArray.push(currentRank);
-            previousRank = currentRank;
-        }
-
-        // Move to the next sponsor in the hierarchy
-        currentReferrer = await Referral.findOne({ myaddress: currentReferrer.sponsoraddress });
-    }
-
-    // Return all qualified addresses with their ranks
-    return {
-        address: addressArray,
-        rank: rankArray
-    };
+   referrer = await Referral.findOne({ myaddress:user });
+   const existsData = await Teamstatistic.findOne({walletaddress:referrer.sponsoraddress});
+   const userRank = existsData?existsData.rank:0;
+   let index = 0;
+   let previousRank = 0;
+   for (let i = 0; i < referrerCount; i++) {
+       const getrank = await Teamstatistic.findOne({walletaddress:referrer.sponsoraddress});
+       const rank = getrank?getrank.rank:0;
+       if (rank >= userRank && rank > previousRank) {
+           const bonusPercentage = (rank - previousRank) * 4;
+           const sponsoraddress = referrer.sponsoraddress;
+           addressArray.push(sponsoraddress);
+           bonusArray.push(bonusPercentage);
+           
+           index++;
+           previousRank = rank;
+       }
+       referrer = await Referral.findOne({ myaddress:referrer.sponsoraddress });
+   }
+   const finalAddressRanks = 
+   {
+       address : addressArray.slice(0, index),
+       bonus : bonusArray.slice(0, index),
+   }
+   
+   return finalAddressRanks; 
 }
-
-async function getThreshold(nftLevel) {
-    const thresholds = [25000, 75000, 225000, 675000, 2025000, 6075000, 18225000];
-    return thresholds[nftLevel - 1] || 0;
-}
-
-
-async function getRequiredAmount(nftLevel) {
-    const amounts = [25000, 75000, 225000, 675000, 2025000, 6075000];
-    return amounts[nftLevel - 1] || 0;
-}
-
 
 
 exports.getUserRank = async(req, res) => {
