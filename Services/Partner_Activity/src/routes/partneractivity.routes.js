@@ -11,7 +11,7 @@ module.exports = app => {
      router.get("/getallsellpriceandbv",auth,partneractivity.getoverallPriceBVSale)
      router.get("/getDirectDetailteamstatistics/:address",auth,partneractivity.getDirectDetailTeamstatistics);
    
-     router.get("/updateUserRank",partneractivity.processTotalUserRank);   // Update Rank temp
+    router.get("/updateUserRank",partneractivity.processTotalUserRank);   // Update Rank temp
       
     router.get("/storeteamstatistics",partneractivity.StoreTeamstatistics);
     router.get("/getteamstatistics",auth,partneractivity.getTeamstatistics);

@@ -24,5 +24,5 @@ db.mongoose
 require("./routes/activity.routes")(app);
 require("./routes/partneractivity.routes")(app);
 app.listen(3002, () => {
-  console.log(`Server is running on port ${3002}.`);
+  console.log(`Partner Activity Server is running on port ${3002}.`);
 });

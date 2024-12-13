@@ -1,10 +1,10 @@
 module.exports = mongoose => {
     var schema = mongoose.Schema(
       {
-        nft: {type:String,index:true},
-        level: {type:Number,index:true},
-        price:Number,
-        bv:Number
+        rewardType: {type:String,index:true},
+        fromUser: {type:String,index:true},
+        toUser: {type:String,index:true},
+        rewardAmount:String
       },
       { timestamps: true }
     );
@@ -14,8 +14,8 @@ module.exports = mongoose => {
       object.id = _id;
       return object;
     });
-
-    const Nft = mongoose.model("nft", schema);
-    return Nft;
+  
+    const Reward = mongoose.model("rewardtable", schema);
+    return Reward;
   };
   
