@@ -18,7 +18,7 @@ module.exports = app => {
     router.get("/getdirectteamstatistics/:address", auth,partneractivity.getDirectTeamstatisticslatestfirst);
     router.put("/updateteamstatistics/:userAddress", auth,partneractivity.updateTeamstatistics);
     router.get("/getuserrankbonuses/:address/:amount/:sponsoraddress",partneractivity.getUserRankBonuses);   // Here I need to fix the bugs
-    router.get("/getuserrank/:address", auth,partneractivity.getUserRank);
+    router.get("/getuserrank/:address",partneractivity.getUserRank);
   
     //get all token for all users
     router.get("/getgraphteamturnover", auth,partneractivity.getGraphToken);
@@ -40,7 +40,17 @@ module.exports = app => {
     router.get("/getusergraphteamturnovermonthly/:address", auth,partneractivity.getUserGraphTeamTurnoverMonthly);
     router.get("/getusergraphteamturnoversixmonths/:address", auth,partneractivity.getUserGraphTeamTurnoverSixMonths);
     router.get("/getusergraphteamturnoveroneyear/:address", auth,partneractivity.getUserGraphTeamTurnoverYearly);
+
+
+    //Get New User Rank bonus , new code 
+    router.get("/getuserranknonous/get_new/:amount/:sponsorID",partneractivity.GetUserNewRankBonous);
+
+
+    //testing API 
+    router.get("/getuserRank/testing/:amount/:sponsorID",partneractivity.GetNewRankBonous);
       
       app.use("/partneractivity", router);
+
+
     };
     

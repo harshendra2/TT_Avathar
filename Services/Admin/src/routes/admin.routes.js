@@ -21,6 +21,9 @@ module.exports = app => {
     router.get("/getdateuseraddress/:sponsoraddress",auth,admincontroller.getdateuseraddress)
      
     router.get('/getdate/:useraddress',auth,admincontroller.getdate);
+
+    //Total sold nft price
+    router.get('/gettotal/mintnft/price',admincontroller.GetTotalNftPrice);
   
     //blanknft
     router.get("/getstatus/:walletaddress/:blanklevel",auth,admincontroller.getblanknftone2)
@@ -46,9 +49,7 @@ module.exports = app => {
   router.get("/getsitemaintancestatus/:adminid",admincontroller.getsitemaintancestatus)
   
   router.put("/updatesitemaintancestatus/:adminid",admincontroller.updateStatussitemainstatus)
-  
-    
     
     app.use("/api/admin", router);
-  };
+  };   
   

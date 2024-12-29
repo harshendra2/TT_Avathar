@@ -209,6 +209,25 @@ exports.getdate = async (req, res) => {
   }
 };
 
+exports.GetTotalNftPrice = async (req, res) => {
+  try {
+  
+    const data = await blanknft.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalMintPrice: { $sum: "$levelprice" },
+        },
+      },
+    ]);
+    const totalPrice =data[0].totalMintPrice
+    return res.status(200).send({ status: true,totalPrice });
+  } catch (err) {
+    return res.status(500).send({ status: false, message: err.message });
+  }
+};
+
+
 
 exports.createBlankNft1 = async (req, res) => {
   try {
