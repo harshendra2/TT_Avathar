@@ -2,10 +2,8 @@ const express = require('express');
 const router = express.Router();
 const proxy = require('express-http-proxy');
 
-// Forward requests to microservices
-router.use('/admin',proxy('http://localhost:3001'));   //Admin
-router.use('/api',proxy('http://localhost:3002'));  // partner activity
-router.use('/nft',proxy('http://localhost:3003'));  //Rank nft and mint nft
-router.use('/api/reffral',proxy('http://localhost:3004'));  //referal
 
+router.use('/admin', proxy('http://Admin:3001'));   // Admin service
+router.use('/api', proxy('http://Partner_Activity:3002'));  // Partner Activity service
+router.use('/nft', proxy('http://Mint_Nft:3003'));  // Mint NFT service
 module.exports = router;

@@ -1,0 +1,41 @@
+version: '3'
+services:
+  gateway:
+    build: ./GatWay
+    image: tt_avathar-gateway
+    ports:
+      - "8080:8080"
+    networks:
+      - TT_avathar_network
+    depends_on:
+      - admin
+      - partner_activity
+      - mint_nft
+
+  admin:
+    build: ./Services/Admin
+    image: tt_avathar-admin
+    ports:
+      - "3001:3001"
+    networks:
+      - TT_avathar_network
+
+  partner_activity:
+    build: ./Services/Partner_Activity
+    image: tt_avathar-partner_activity
+    ports:
+      - "3002:3002"
+    networks:
+      - TT_avathar_network
+
+  mint_nft:
+    build: ./Services/Mint_Nft
+    image: tt_avathar-mint_nft
+    ports:
+      - "3003:3003"
+    networks:
+      - TT_avathar_network
+
+networks:
+  TT_avathar_network:
+    driver: bridge
