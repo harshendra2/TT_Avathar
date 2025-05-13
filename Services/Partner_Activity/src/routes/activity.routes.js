@@ -6,6 +6,6 @@ module.exports = app => {
     router.post("/checkReffer",auth, activity.CheckReffer);
     router.post("/storeteamstatistics",activity.StoreTeamstatistics);
 
-    app.use("/activity",router);
+    app.use(router);
 };
   

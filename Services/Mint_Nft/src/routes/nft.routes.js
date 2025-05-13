@@ -13,6 +13,6 @@ module.exports = app => {
   
     router.delete("/:id",auth, nfts.delete);
   
-    app.use("/api/nfts", router);
+    app.use("/nfts", router);
   };
   

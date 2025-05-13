@@ -7,6 +7,6 @@ module.exports = app => {
     router.post("/", auth,swaps.StoreSwaps);
     router.get("/", auth,swaps.GetSwaps);
     router.get("/getswapdata/:address",auth,swaps.getswapdata)
-    app.use("/api/swaps", router);
+    app.use("/swaps", router);
   };
   

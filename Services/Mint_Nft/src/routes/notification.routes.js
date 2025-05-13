@@ -22,6 +22,6 @@ module.exports = app => {
   
     router.delete("/deletenotificationbywalletaddress/:walletaddress",auth,notification.deletenotificationuseraddress)
   
-    app.use("/api/notification", router);
+    app.use("/notification", router);
   };
   

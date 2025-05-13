@@ -76,6 +76,31 @@ async function callUserRank() {
 }
 
 
+async function UserReward() {
+    try {
+        const baseUrl = 'http://localhost:8080/api/admin/update/Unclaimed/reward';
+        // Construct the full URL with parameters
+        const fullUrl = `${baseUrl}`;
+        const response = await fetch(fullUrl, {
+            method: 'PUT',
+            mode: 'cors', 
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+        const data = await response.json();
+        logMessage('Success: Received HTTP 200 for update user rank.');
+
+    } catch (error) {
+        console.error('There was a problem with the fetch operation:', error);
+        logMessage(`Error: ${error.message}`);
+    }
+}
+
+
 
 
 const setupCronJobs =async () => {
@@ -85,6 +110,16 @@ const setupCronJobs =async () => {
             // logMessage('Running task every 5 minutes');
         } catch (error) {
             console.error('Error executing scheduled task:', error);
+            logMessage(`Error executing scheduled task: ${error.message}`);
+        } finally {
+            logMessage('Script ended');
+        }
+    });
+
+    cron.schedule('0 0 * * *',async() => {
+        try {
+            await UserReward()
+        } catch (error) {
             logMessage(`Error executing scheduled task: ${error.message}`);
         } finally {
             logMessage('Script ended');

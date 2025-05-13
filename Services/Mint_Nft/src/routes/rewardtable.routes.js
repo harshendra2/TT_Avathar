@@ -9,6 +9,6 @@ module.exports = app => {
   
     router.get("/getreward",auth,reward.getreward)
     
-    app.use("/api/reward", router);
+    app.use("/reward", router);
   };
   

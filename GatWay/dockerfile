@@ -1,4 +1,27 @@
-FROM node:18.17.1
+# FROM node:18.17.1
+
+# WORKDIR /server
+
+# COPY package*.json ./
+
+# RUN npm install
+
+# COPY . .
+
+# EXPOSE 8080
+
+# CMD ["npm","start"]
+
+
+
+
+
+
+
+###########################################
+# Stage 1: Build (Full Node.js environment)    / Multi Stage Docker files
+###########################################
+FROM node:18.17.1 AS builder
 
 WORKDIR /server
 
@@ -8,6 +31,69 @@ RUN npm install
 
 COPY . .
 
+RUN npm run build 
+
+###########################################
+# Stage 2: Runtime (Minimal image)
+###########################################
+FROM node:18.17.1-alpine  # Lightweight Alpine-based Node.js
+
+WORKDIR /server
+
+COPY --from=builder /server/package*.json ./
+RUN npm install --omit=dev  # No devDependencies
+
+COPY --from=builder /server/dist ./dist    # For TypeScript
+COPY --from=builder /server/src ./src     # For plain JS (adjust paths)
+COPY --from=builder /server/public ./public  # Static files (if any)
+
+COPY --from=builder /server/config ./config
+
 EXPOSE 8080
 
-CMD ["npm","start"]
+CMD ["npm", "start"]
+
+
+
+
+
+
+
+
+###########################################
+# Stage 1: Build (Full Node.js environment)       / Distroless Docker file
+###########################################
+FROM node:18.17.1 AS builder
+
+WORKDIR /server
+
+COPY package*.json ./
+
+RUN npm install
+
+COPY . .
+
+RUN npm run build  # Skip if plain JavaScript
+
+###########################################
+# Stage 2: Runtime (Distroless)
+###########################################
+FROM gcr.io/distroless/nodejs18-debian11  # No shell, no package manager
+
+WORKDIR /server
+
+COPY --from=builder /server/node_modules ./node_modules
+COPY --from=builder /server/dist ./ 
+
+COPY --from=builder /server/public ./public
+
+USER 1000
+
+EXPOSE 8080
+
+CMD ["dist/index.js"]
+
+
+
+
+

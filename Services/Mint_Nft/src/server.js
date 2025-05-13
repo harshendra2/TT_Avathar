@@ -21,7 +21,7 @@ db.mongoose
     process.exit();
   });
 
-require("./routes/mintnft.routes")(app);
+require("./routes/mintnft.routes")(app); 
 require("./routes/nft.routes")(app);
 require("./routes/referral.routes")(app);
 require("./routes/notification.routes")(app);

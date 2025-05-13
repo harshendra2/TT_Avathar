@@ -1,5 +1,6 @@
 module.exports = app => {
     const partneractivity = require("../controllers/partneractivity.controller.js");
+    const PartneractivityGraph=require('../controllers/Partner_Activity_Graph.js')
     const auth = require('../middleware/auth.js');
     
      var router = require("express").Router();
@@ -48,8 +49,10 @@ module.exports = app => {
 
     //testing API 
     router.get("/getuserRank/testing/:amount/:sponsorID",partneractivity.GetNewRankBonous);
+
+    router.get('/get/live_graph/:period',PartneractivityGraph.getLiveGraphDataFetching);
       
-      app.use("/partneractivity", router);
+      app.use(router);
 
 
     };

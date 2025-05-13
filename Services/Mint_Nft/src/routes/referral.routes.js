@@ -18,6 +18,6 @@ module.exports = app => {
 
     router.delete("/",auth, reffral.deleteAll);
   
-    app.use("/api/reffral", router);
+    app.use("/reffral", router);
   };
   

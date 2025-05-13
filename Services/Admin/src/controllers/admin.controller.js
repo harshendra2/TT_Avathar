@@ -7,6 +7,10 @@ const referrals = db.referrals
 const Teamstatistic = db.teamstatistics
 const { generateToken } = require("../helpers/userhelpers");
 const blanknft = db.blanknft;
+const UserRewards=db.UserRewards;
+const {ethers}=require('ethers');
+const jwt = require("jsonwebtoken");
+const secret = process.env.JWT_SECRET || "default";
 
 exports.create = async (req, res) => {
   try {
@@ -55,7 +59,15 @@ exports.adminlogin = async (req, res) => {
         .status(400)
         .send({ status: false, message: "password is incorrect" });
     }
-    const token = generateToken(admin.email, admin._id);
+    // const token = generateToken(admin.email, admin._id);
+    const token = jwt.sign(
+        {
+          username:admin.email,
+          userId: admin._id
+        },
+        secret,
+        { expiresIn: "24h" }
+      );
     return res
       .status(200)
       .send({
@@ -715,3 +727,542 @@ exports.updateStatussitemainstatus = (req, res) => {
       });
   });
 };
+
+
+exports.GetAllSponsorAdd = async (req, res) => {
+  try {
+    const data = await referrals.aggregate([
+      {
+        $match: {
+          sponsoraddress: "0x0000000000000000000000000000000000000000"
+        }
+      },
+      {
+        $project: {
+          myaddress: 1
+        }
+      },
+      {
+        $lookup: {
+          from: 'teamstatistics',   
+          localField: 'myaddress',  
+          foreignField: 'walletaddress',
+          as: 'teamsale'          
+        }
+      },
+      {
+        $lookup: {
+          from: 'mintnfts',         
+          localField: 'myaddress',   
+          foreignField: 'useraddress', 
+          as: 'selfamount'        
+        }
+      },
+      {
+        $unwind: {
+          path: '$selfamount',     
+          preserveNullAndEmptyArrays: true 
+        }
+      },
+      {
+        $group: {
+          _id: '$myaddress',          
+          selfamount: { $sum: '$selfamount.mintprice' },
+          teamsale: { $first: '$teamsale' }
+        }
+      },
+      {
+        $project: {
+          'teamsale.teamsale': 1,      
+          myaddress: '$_id',        
+          selfamount: 1         
+        }
+      },
+      {
+        $sort: { 'teamsale.teamsale': -1 } // Descending order
+      },
+    ]);
+    
+    
+    return res.status(200).json(data);
+    
+  } catch (error) {
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+exports.GetFilterData = async (req, res) => {
+  const { search } = req.params;
+
+  try {
+    let value = search.toLowerCase();
+    const data = await referrals.aggregate([
+      {
+        $match: {
+          sponsoraddress: "0x0000000000000000000000000000000000000000",
+        },
+      },
+      {
+        $project: {
+          myaddress: 1,
+        },
+      },
+      {
+        $lookup: {
+          from: "teamstatistics",
+          localField: "myaddress",
+          foreignField: "walletaddress", 
+          as: "teamsale", 
+        },
+      },
+      {
+        $lookup: {
+          from: "mintnfts", 
+          localField: "myaddress", 
+          foreignField: "useraddress",
+          as: "selfamount",
+        },
+      },
+      {
+        $unwind: {
+          path: "$selfamount",
+          preserveNullAndEmptyArrays: true, 
+        },
+      },
+      {
+        $match: {
+          $or: [
+            { myaddress: value },
+            {'teamsale.teamsale': parseInt(value) },
+          ],
+        },
+      },
+      {
+        $group: {
+          _id: "$myaddress",
+          selfamount: { $sum: "$selfamount.mintprice" }, 
+          teamsale: { $first: "$teamsale" }, 
+        },
+      },
+      {
+        $project: {
+          "teamsale.teamsale": 1,
+          myaddress: "$_id", 
+          selfamount: 1,
+        },
+      },
+    ]);
+     if(data.length>0){
+      return res.status(200).json(data);
+     }else{
+      return res.status(404).json({ error: "No matching data found for the given filter." });
+     }
+
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ error: "Internal server error" }); // Error handling
+  }
+};
+
+
+
+const rpcURL = 'https://base-sepolia.g.alchemy.com/v2/xxaYwLCcRxFjiv1-ro4nyCh3VX8u7Wv6';
+const provider =new ethers.providers.JsonRpcProvider(rpcURL);
+    
+//Get UnClaimed Rewards
+const contractAddressStake = '0x29533194b47A9E2923830Fe4B2380582d37ff9fD';
+const contractABI = require("../contract/EVCNFTStake");
+
+//Get Pool contract
+const contractVest ="0x853408EB4dc116379793F86C5822C537d11224d5";
+const contractProol=require('../contract/Pool');
+
+//Swap Sold Data
+
+const tokenAddress = "0x0a5eF86dB50b0656C762BF453aCD6A7a071e9042";
+const poolAddress = "0xB2EFa411DB33ac74F54C2A8d4aC323714D31c439";
+// const taxAddress = "0x15EA3A5a3969368f417C251E78f25e342BfC0BB5";
+const tokenABI = [
+  "event Transfer(address indexed from, address indexed to, uint value)"
+];
+
+
+const getContractInstance = async (contractAddressStake,contractABI,provider) => {
+  return new ethers.Contract(contractAddressStake, contractABI, provider);
+};
+
+// Fetch Tokens of Staker
+const getTokensOfStaker = async (account) => {
+  try {
+    const contract = await getContractInstance(contractAddressStake,contractABI,provider);
+    const tokensOfStakerNFTIDs = await contract.getAvatarsOfStaker(account); 
+    return tokensOfStakerNFTIDs;
+  } catch (error) {
+    return [];
+  }
+};
+
+
+const getUnClaimableReward = async (id) => {
+  try {
+    const contract = await getContractInstance(contractAddressStake,contractABI,provider);
+    const idUnClaimValue = await contract.getUnclaimedTTReward(id.toString());
+  
+  const ethValue = ethers.utils.formatEther(idUnClaimValue.toString());
+  return parseFloat(ethValue).toFixed(6);
+  } catch (error) {
+   return "0.000000";
+  }
+};
+
+
+
+
+const GetRemainingRank = async (account) => {
+  try {
+    const contract = await getContractInstance(contractVest, contractProol, provider);
+
+    const totalClaimedRewardInfo = await contract.getRemainingTTAmountRB(account);
+
+    if (totalClaimedRewardInfo === '0x' || totalClaimedRewardInfo === '0x0') {
+      return 0; 
+    }
+
+    const formattedValue = ethers.utils.formatEther(totalClaimedRewardInfo.toString());
+    return parseFloat(formattedValue).toFixed(6); 
+
+  } catch (error) {
+    return 0; 
+  }
+};
+
+exports.getRewardsData = async (req, res) => {
+  try {
+    const AllAddress = await referrals.aggregate([{ $group: { _id: '$myaddress' } }]);
+
+    for (let element of AllAddress) {
+      let totalUnclaimedReward = 0;
+
+      // Fetch staked token IDs for the user
+      const userStakedIdInfo = await getTokensOfStaker(element?._id.toString());
+      const [TotalClaimed, Swap] = await Promise.all([
+        getTokenInfos(element?._id.toString()),  // Get TotalClaimed
+        getTotalSwappedAmountToPoolAndTax(element?._id.toString())  // Get Swap
+      ]);
+      for (let i = 0; i < userStakedIdInfo.length; i++) {
+        const unclaimedRewardInfo = await getUnClaimableReward(userStakedIdInfo[i]);
+        const parsedReward = parseFloat(unclaimedRewardInfo);
+
+        if (!isNaN(parsedReward)) {
+          totalUnclaimedReward += parsedReward;
+        }
+      }
+
+      let rank = await GetRemainingRank(element?._id.toString());
+      rank = isNaN(rank) ? 0 : parseFloat(rank);
+
+      totalUnclaimedReward = isNaN(totalUnclaimedReward) ? 0 : parseFloat(totalUnclaimedReward.toFixed(6));
+      const totalReward = parseFloat((totalUnclaimedReward + rank).toFixed(6));
+     
+      const existedUser = await UserRewards.findOneAndUpdate(
+        { useraddress: element._id },
+        {
+          UnclaimedReward: totalReward,
+          CliamedReward:TotalClaimed,
+          swap:Swap
+        },
+        {
+          new: true,
+          upsert: true,
+        }
+      );
+    }
+
+    res.status(200).json({ message: "User Data is updated successfully" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+
+
+
+exports.GetAllUserRewards = async (req, res) => {
+  const { page,limit} = req.params;
+  try {
+   
+    const skips =parseInt(limit)*parseInt(page )- 1
+    let count=await UserRewards.countDocuments();
+    let totalPage=count/parseInt(limit);
+
+
+    const data = await UserRewards.aggregate([
+      {$sort:{UnclaimedReward:-1}},
+      { $project: { useraddress: 1, UnclaimedReward: 1 } },
+      { $skip: skips },
+      { $limit:parseInt(limit)},
+    ]);
+
+    const result = await Promise.all(
+      data.map(async (address) => {
+        try {
+         const [TotalClaimed, Swap] = await Promise.all([
+          getTokenInfos(address?.useraddress.toString()),  // Get TotalClaimed
+          getTotalSwappedAmountToPoolAndTax(address?.useraddress.toString())  // Get Swap
+        ]);
+          return {
+            useraddress: address?.useraddress,
+            TotalClaimed:parseFloat(TotalClaimed),
+            UnclaimedReward: address?.UnclaimedReward,
+            Swap:parseFloat(Swap)
+          };
+        } catch (error) {
+          return {
+            useraddress: address?.useraddress,
+            TotalClaimed: "Error fetching rewards",
+            UnclaimedReward: address?.UnclaimedReward,
+          };
+        }
+      })
+    );
+
+    return res.status(200).send({result,currentPage:page,totalPage,TotalUser:count});
+  } catch (error) {
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+
+
+
+const getTokenInfos = async (account) => {
+  try {
+    const contractStake = new ethers.Contract(contractAddressStake, contractABI, provider);
+    const contractVests = new ethers.Contract(contractVest, contractProol, provider);
+
+    const [stakeRewardAmount, rankRewardAmount] = await Promise.all([
+      contractStake.getUserTTClaimedAvatarStake(account),
+      contractVests.getUserTTRedeemedAmount(account),
+    ]);
+
+    const stakeRewardAmountInEther = ethers.utils.formatEther(stakeRewardAmount);
+    const rankRewardAmountInEther = ethers.utils.formatEther(rankRewardAmount);
+
+    const totalClaimed = parseFloat(stakeRewardAmountInEther) + parseFloat(rankRewardAmountInEther);
+
+    return totalClaimed.toFixed(6);
+  } catch (error) {
+    console.log(error);
+    throw 'Data not found';
+  }
+};
+
+
+
+async function getTotalSwappedAmountToPoolAndTax(userAddress) {
+  const taxRate = 0.05;
+  const fromBlock = 1;
+  const toBlock = "latest";
+
+  try {
+    const tokenContract = new ethers.Contract(tokenAddress, tokenABI, provider);
+
+    // Use `queryFilter` for a range of blocks, and apply more efficient block limits if necessary.
+    const eventsToPool = await tokenContract.queryFilter(
+      tokenContract.filters.Transfer(userAddress, poolAddress),
+      fromBlock,
+      toBlock
+    );
+
+    // Efficient accumulation of tokens transferred to pool.
+    const totalTokensTransferredToPool = eventsToPool.reduce((acc, event) => 
+      acc.add(event.args.value), ethers.BigNumber.from(0)
+    );
+
+    // Calculate the total value and format it only once.
+    const totalValue = totalTokensTransferredToPool.div(ethers.BigNumber.from((1 - taxRate) * 100).toString());
+    const formattedValueInEther = ethers.utils.formatUnits(totalValue, 18);
+
+    return formattedValueInEther;
+
+  } catch (error) {
+    console.error(error);
+    throw new Error('Data not found');
+  }
+}
+
+
+
+exports.FilterUserRewards=async(req,res)=>{
+  const {search}=req.params;
+  try{
+    const userId=search.toLowerCase();
+   
+    const data=await UserRewards.findOne({useraddress:userId})
+     if(!data){
+      const existedUser=await referrals.findOne({myaddress:search.toString()})
+      if(!existedUser){
+        return res.status(404).json({ error: "No matching data found for the given filter." });
+      }
+     }
+   
+    let result=[]
+    if(data){
+      const [TotalClaimed, Swap] = await Promise.all([
+        getTokenInfos(search.toString()),  // Get TotalClaimed
+        getTotalSwappedAmountToPoolAndTax(search.toString())  // Get Swap
+      ]);
+        result.push({
+          useraddress:userId,
+          TotalClaimed:parseFloat(TotalClaimed),
+          UnclaimedReward: data?.UnclaimedReward,
+          Swap:parseFloat(Swap)
+        })
+
+        if(result.length>0){
+           return res.status(200).send({result:result});
+        }
+    }else{
+
+      let totalUnclaimedReward = 0;
+
+const [userStakedIdInfo, rankRaw] = await Promise.all([
+  getTokensOfStaker(userId.toString()),
+  GetRemainingRank(userId.toString())
+]);
+
+const unclaimedRewards = await Promise.all(
+  userStakedIdInfo.map(tokenId => getUnClaimableReward(tokenId))
+);
+
+totalUnclaimedReward = unclaimedRewards.reduce(
+  (sum, reward) => sum + (parseFloat(reward) || 0),
+  0
+);
+
+const rank = parseFloat(rankRaw) || 0;
+
+const totalReward = +(totalUnclaimedReward + rank).toFixed(6);
+
+const [TotalClaimed, Swap] = await Promise.all([
+  getTokenInfos(search.toString()),
+  getTotalSwappedAmountToPoolAndTax(search.toString())
+]);
+
+const existedUser = await UserRewards.findOneAndUpdate(
+  { useraddress: userId },
+  { UnclaimedReward: totalReward },
+  { new: true, upsert: true }
+);
+
+result.push({
+  useraddress: userId,
+  TotalClaimed: +TotalClaimed,
+  UnclaimedReward: totalReward,
+  Swap: +Swap
+});
+
+return res.status(200).json({result:result});   
+    }
+       
+  }catch(error){
+    return res.status(500).json({error:"Internal server error"});
+  }
+}
+
+exports.GetUserStats=async(req,res)=>{
+  try{
+    const AllUser = await referrals.aggregate([
+      {
+        $group: {
+          _id: "$myaddress",
+        },
+      },
+      {
+        $lookup: {
+          from: "teamstatistics",
+          localField: "_id", 
+          foreignField: "walletaddress",
+          as: "teamsale",
+        },
+      },
+      {
+        $lookup: {
+          from: "mintnfts", 
+          localField: "_id",
+          foreignField: "useraddress",
+          as: "selfamount",
+        },
+      },
+      {
+        $unwind: {
+          path: "$selfamount",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+      {
+        $group: {
+          _id: "$_id",
+          TotalNFT: { $sum: "$selfamount.mintprice" }, 
+          NftLevels: { $addToSet: { $toString: "$selfamount.level" } },
+          teamsale: { $first: "$teamsale" }, 
+        },
+      },
+      {
+        $project: {
+          _id: 0, 
+          myaddress: "$_id",
+          TotalNFT: 1, 
+           rank: { $arrayElemAt: ["$teamsale.rank", 0] } , 
+          NftLevel: {
+            $reduce: {
+              input: "$NftLevels",
+              initialValue: "",
+              in: {
+                $concat: [
+                  "$$value",
+                  { $cond: [{ $eq: ["$$value", ""] }, "", ","] },
+                  "$$this",
+                ],
+              },
+            },
+          },
+        },
+      },
+    ]);
+    
+  return res.status(200).send(AllUser);
+  }catch(error){
+    return res.status(500).json({error:"Internal server error"});
+  }
+}
+
+exports.GetTT_Rewards=async(req,res)=>{
+  try{
+    const data = await UserRewards.aggregate([
+      {
+        $group: {
+          _id: null,
+          TotalUnclaimed: { $sum: '$UnclaimedReward' },
+          TotalClaimed: { $sum: '$CliamedReward' },
+          TotalSwap: { $sum: '$swap' }
+        }
+      }
+    ]);
+    
+    return res.status(200).send(data[0] || {});
+    
+  }catch(error){
+    return res.status(500).json({error:"Internal server error"});
+  }
+}
+
+
+exports.GetAllUser=async(req,res)=>{
+  try{
+    const data = await referrals.find({});
+    return res.status(200).send(data);
+  }catch(error){
+    return res.status(500).json({error:"Internal server error"});
+  }
+}

@@ -2,8 +2,21 @@ const express = require('express');
 const router = express.Router();
 const proxy = require('express-http-proxy');
 
+// Admin service
+router.use('/api/admin', proxy('http://localhost:3001', {
+    proxyReqPathResolver: (req) => req.originalUrl.replace('/api/admin', '')
+}));
 
-router.use('/admin', proxy('http://Admin:3001'));   // Admin service
-router.use('/api', proxy('http://Partner_Activity:3002'));  // Partner Activity service
-router.use('/nft', proxy('http://Mint_Nft:3003'));  // Mint NFT service
+// Partner Activity service
+
+router.use('/partneractivity', proxy('http://localhost:3002', {
+    proxyReqPathResolver: (req) => req.originalUrl.replace('/partneractivity', '')
+}));
+
+// Mint NFT service
+router.use('/api/mint', proxy('http://localhost:3003', {
+    proxyReqPathResolver: (req) => req.originalUrl.replace('/api/mint', '')
+}));
+
 module.exports = router;
+

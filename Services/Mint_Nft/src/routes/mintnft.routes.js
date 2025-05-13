@@ -19,6 +19,6 @@ module.exports = app => {
 
    router.get("/getUserJoinedDetails/:useraddress",auth,mintnfts.getUserJoinedDetails)
 
-    app.use("/api/mintnfts", router);
+    app.use("/mintnfts", router);
 };
 

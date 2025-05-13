@@ -5,7 +5,7 @@ module.exports = app => {
    
     router.post("/createadmin", auth,admincontroller.create);
   
-    router.post("/adminlogin", auth,admincontroller.adminlogin);
+    router.post("/adminlogin",admincontroller.adminlogin);
 
     //blanknft routes
     router.post("/storeblanknft",auth,admincontroller.createBlankNft)
@@ -18,7 +18,7 @@ module.exports = app => {
   
     router.delete("/deleteblanknft",auth,admincontroller.deleteallblanknftdata)
   
-    router.get("/getdateuseraddress/:sponsoraddress",auth,admincontroller.getdateuseraddress)
+    router.get("/getdateuseraddress/:sponsoraddress",auth,admincontroller.getdateuseraddress);
      
     router.get('/getdate/:useraddress',auth,admincontroller.getdate);
 
@@ -26,30 +26,49 @@ module.exports = app => {
     router.get('/gettotal/mintnft/price',admincontroller.GetTotalNftPrice);
   
     //blanknft
-    router.get("/getstatus/:walletaddress/:blanklevel",auth,admincontroller.getblanknftone2)
+    router.get("/getstatus/:walletaddress/:blanklevel",auth,admincontroller.getblanknftone2);
   
-    router.get("/getblanknft/:walletaddress",auth,admincontroller.getdataone)
+    router.get("/getblanknft/:walletaddress",auth,admincontroller.getdataone);
   
-    router.get("/currentblanknft/:walletaddress",auth,admincontroller.getdataone2)
+    router.get("/currentblanknft/:walletaddress",auth,admincontroller.getdataone2);
   
-    router.post("/storeblanknft2",auth,admincontroller.createBlankNft5)
+    router.post("/storeblanknft2",auth,admincontroller.createBlankNft5);
   
     //
   
-    router.post("/storetokenid",auth,admincontroller.storetokenid)
+    router.post("/storetokenid",auth,admincontroller.storetokenid);
   
-    router.get("/getalltokeniddata",auth,admincontroller.getalltokeiddata)
+    router.get("/getalltokeniddata",auth,admincontroller.getalltokeiddata);
   
-    router.post("/forgetpassword",admincontroller.forgetpassword)
+    router.post("/forgetpassword",admincontroller.forgetpassword);
   
-    router.post("/resetpassword",admincontroller.resetpassword)
+    router.post("/resetpassword",admincontroller.resetpassword);
   
-  router.post("/sitemaintance",admincontroller.postwebsitemaintancestatus)
+  router.post("/sitemaintance",admincontroller.postwebsitemaintancestatus);
   
-  router.get("/getsitemaintancestatus/:adminid",admincontroller.getsitemaintancestatus)
+  router.get("/getsitemaintancestatus/:adminid",admincontroller.getsitemaintancestatus);
   
   router.put("/updatesitemaintancestatus/:adminid",admincontroller.updateStatussitemainstatus)
+
+  //Get all sponsore
+  router.get('/getdirectuser',admincontroller.GetAllSponsorAdd);
+  router.get('/filter/directuser/:search',auth,admincontroller.GetFilterData);
+
+
+  router.put('/update/Unclaimed/reward',admincontroller.getRewardsData);
+
+  router.get('/get/Userreward/:page/:limit',auth,admincontroller.GetAllUserRewards);
+  router.get('/filter/userreward/:search',auth,admincontroller.FilterUserRewards);
+
+  // Dashboard
+  router.get('/admin/useStatus',auth,admincontroller.GetUserStats);
+  router.get('/get/tt_reward',admincontroller.GetTT_Rewards);
+
+  router.get('/get/all_user',admincontroller.GetAllUser);
     
-    app.use("/api/admin", router);
+    app.use(router);
   };   
-  
+
+ 
+
+ 
